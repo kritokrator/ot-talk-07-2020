@@ -1,3 +1,0 @@
-Flask==1.1.2
-opentelemetry-api==0.10b0
-opentelemetry-sdk==0.10b0
