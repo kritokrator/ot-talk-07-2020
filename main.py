@@ -1,7 +1,7 @@
-import datetime
-import time
-
-from flask import Flask, render_template
+import aiohttp
+from aiohttp import web
+import asyncio
+import yarl
 
 # tracing.py
 from opentelemetry import trace
@@ -9,7 +9,14 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.exporter.cloud_trace import CloudTraceSpanExporter
 from opentelemetry.sdk.trace.export import SimpleExportSpanProcessor
 
-from opentelemetry.ext.flask import FlaskInstrumentor
+from opentelemetry.ext.aiohttp_client import (
+    create_trace_config,
+    url_path_span_name
+)
+
+
+def strip_query_params(url: yarl.URL) -> str:
+    return str(url.with_query(None))
 
 trace.set_tracer_provider(TracerProvider())
 trace.get_tracer_provider().add_span_processor(
@@ -17,30 +24,40 @@ trace.get_tracer_provider().add_span_processor(
 )
 tracer = trace.get_tracer(__name__)
 
-app = Flask(__name__)
 
-FlaskInstrumentor().instrument_app(app)
-
-@app.route('/')
-def root():
-    print("Hello world from OpenTelemetry Python!")
-    time.sleep(1)
-    foo("going deeper", "underdark")
-    return "It works!"
-
-
-def foo(value1, value2):
-    with tracer.start_as_current_span(f"Span for foo: {value2}"):
-        time.sleep(1)
-        print(f"value1: {value1}")
-        bar("going even deeper", "moria")
+async def hello_async(request):
+    with tracer.start_as_current_span("root"):
+        awaitables = [
+            get_page('https://google.com', request),
+            get_page('https://reddit.com', request),
+            get_page('https://youtube.com', request),
+        ]
+        for future in asyncio.as_completed(awaitables):
+            response = await future
+            print(response.status)
+        return web.Response(text="It works!")
 
 
-def bar(value1, value2):
-    with tracer.start_as_current_span(f"Span for bar {value2}"):
-        time.sleep(2)
-        print(f"value1: {value1}")
+async def get_page(url, request):
+    with tracer.start_as_current_span(f"get page: {url}"):
+        async with aiohttp.ClientSession(trace_configs=[request.app['trace_config']]) as session:
+            response = await session.get(url)
+            return response
 
 
-if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=8080, debug=True)
+def init_app(*args, **kwargs):
+    app = web.Application()
+    trace_config = create_trace_config(
+        # Remove all query params from the URL attribute on the span.
+        url_filter=strip_query_params,
+        # Use the URL's path as the span name.
+        span_name=url_path_span_name
+    )
+    app['trace_config'] = trace_config
+    app.router.add_get('/', hello_async,
+                       name='async_call')
+
+    return app
+
+
+app = init_app()

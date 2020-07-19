@@ -2,4 +2,8 @@ Flask==1.1.2
 opentelemetry-api==0.10b0
 opentelemetry-sdk==0.10b0
 opentelemetry-exporter-cloud-trace==0.10b0
-opentelemetry-ext-flask==0.10b0
+uvloop==0.14.0
+gunicorn==20.0.4
+aiohttp==3.6.2
+opentelemetry-ext-aiohttp-client==0.10b0
+
