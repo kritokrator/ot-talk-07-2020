@@ -9,6 +9,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.exporter.cloud_trace import CloudTraceSpanExporter
 from opentelemetry.sdk.trace.export import SimpleExportSpanProcessor
 
+from opentelemetry.ext.flask import FlaskInstrumentor
 
 trace.set_tracer_provider(TracerProvider())
 trace.get_tracer_provider().add_span_processor(
@@ -18,13 +19,14 @@ tracer = trace.get_tracer(__name__)
 
 app = Flask(__name__)
 
+FlaskInstrumentor().instrument_app(app)
+
 @app.route('/')
 def root():
-    with tracer.start_as_current_span("root"):
-        print("Hello world from OpenTelemetry Python!")
-        time.sleep(1)
-        foo("going deeper", "underdark")
-        return "It works!"
+    print("Hello world from OpenTelemetry Python!")
+    time.sleep(1)
+    foo("going deeper", "underdark")
+    return "It works!"
 
 
 def foo(value1, value2):
