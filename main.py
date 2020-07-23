@@ -5,7 +5,7 @@ import yarl
 
 # tracing.py
 from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace import TracerProvider, SpanContext
 from opentelemetry.exporter.cloud_trace import CloudTraceSpanExporter
 from opentelemetry.sdk.trace.export import SimpleExportSpanProcessor
 
@@ -26,7 +26,10 @@ tracer = trace.get_tracer(__name__)
 
 
 async def hello_async(request):
-    with tracer.start_as_current_span("root"):
+    trace_id = int(request.headers['Span-Trace-Id'])
+    context = SpanContext(trace_id=trace_id, span_id=10, is_remote=True)
+    with tracer.start_as_current_span("root", parent=context):
+
         awaitables = [
             get_page('https://google.com', request),
             get_page('https://reddit.com', request),
